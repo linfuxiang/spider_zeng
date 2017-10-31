@@ -4,7 +4,6 @@ const cheerio = require('cheerio');
 
 const CONFIG = require('./config.js');
 const PLUGIN = require('./plugin.js');
-// const URL = encodeURI(URL.SPIDER_URL);
 
 CONFIG.SPIDER_URL.forEach(function(url, idx) {
     superagent
@@ -36,7 +35,7 @@ function findImportantText($) {
                     flag = true;
                 }
             });
-
+            // $(item).parent()
             //如果是叶子节点，进行内容分析
             if (!flag) {
                 let str_inner = $(item).html().replace(/(\<br\>)/g, '\r\n').replace(/\&nbsp;/g, ' ');
@@ -52,6 +51,20 @@ function findImportantText($) {
         }
     });
 
-    PLUGIN.writeFile(`${CONFIG.DIRECTORY_NAME}/${$('title').text()}.txt`, str);
-    
+    if(!PLUGIN.checkFileExist(`${CONFIG.DIRECTORY_NAME}/`)) {   // 先判断目录是否存在，不存在则创建
+        PLUGIN.mkdirSync(CONFIG.DIRECTORY_NAME);
+    }
+
+    let dirList = PLUGIN.readdirSync(`./${CONFIG.DIRECTORY_NAME}`);     // 把结果存为文件，名字重复在后面增加'---\d'
+    if (dirList.includes(`${$('title').text()}.txt`)) {
+        let regRes = 0;
+        dirList.forEach((item, idx) => {
+            if (new RegExp(`${$('title').text()}---\\d.txt`, 'i').test(item)) {
+                regRes++;
+            }
+        });
+        PLUGIN.writeFile(`${CONFIG.DIRECTORY_NAME}/${$('title').text()}---${++regRes}.txt`, str);
+    } else {
+        PLUGIN.writeFile(`${CONFIG.DIRECTORY_NAME}/${$('title').text()}.txt`, str);
+    }
 }
