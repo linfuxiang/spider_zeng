@@ -8,7 +8,7 @@
  */
 const configs = {
     SPIDER_URL: [
-        'https://www.zhihu.com/question/20443516',
+        // 'https://www.zhihu.com/question/20443516',
         'http://news.ifeng.com/a/20150219/43201470_0.shtml',
     ],
     DIRECTORY_NAME: '曾国藩文章',
