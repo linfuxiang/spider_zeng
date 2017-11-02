@@ -5,23 +5,49 @@ const cheerio = require('cheerio');
 const CONFIG = require('./config.js');
 const PLUGIN = require('./plugin.js');
 
+let promiseArray = [];
 CONFIG.SPIDER_URL.forEach(function(url, idx) {
-    superagent
-        .get(url)
-        // .query({
-        //     'wd': URL.KEY_WORD
-        // })
-        .end(function(err, res) {
-            if (err) {
-                console.log(err);
-                return false;
-            }
-            let $ = cheerio.load(res.text, { decodeEntities: false }); // decodeEntities:false是防止出现中文编码问题
-            findImportantText($);
-        });
+    promiseArray.push(new Promise(function(resolve, reject) {
+        superagent
+            .get(url)
+            // .query({
+            //     'wd': URL.KEY_WORD
+            // })
+            // .charset('gbk')
+            .end(function(err, res) {
+                if (err) {
+                    console.log(err);
+                    reject();
+                    return false;
+                }
+                let $ = cheerio.load(res.text, { decodeEntities: false }); // decodeEntities:false是防止出现中文字符变成编码问题
+                // findImportantText($);
+                resolve({ $: $, url: url });
+            });
+    }));
 });
+Promise.all(promiseArray)
+    .then(([...resultArr]) => {
+        resultArr.forEach(function(obj, idx) {
+            findImportantText(obj.$, obj.url);
+        })
+    }).catch(err => console.log(err));
 
-function findImportantText($) {
+function findImportantText($, url) {
+    if (/gb/.test($('meta[charset]').attr('charset')) && url) {
+        superagent
+            .get(url)
+            .charset('gbk')
+            .end(function(err, res) {
+                if (err) {
+                    console.log(err);
+                    return false;
+                }
+                let $ = cheerio.load(res.text, { decodeEntities: false }); // decodeEntities:false是防止出现中文字符变成编码问题
+                findImportantText($);
+            });
+        return;
+    }
     let len = 0;
     let str = '';
     let testTagReg = /(div|section|span|p)/i;
@@ -40,7 +66,14 @@ function findImportantText($) {
             //如果是叶子节点，而且父节点未被分析过，进行内容分析
             if (!flag && !temp_arr.includes($(item).parent()[0]) && /div/.test($(item).parent()[0].tagName.toLowerCase())) {
                 temp_arr.push($(item).parent()[0]);
-                str += index++ + checkParent($, $(item).parent()) + '\r\n';
+                let result = checkParent($, $(item).parent());
+                let temp_str = str.replace(/(\r\n|\s|\t|\r|\n|\v)/g, ''),
+                    temp_res = result.replace(/(\r\n|\s|\t|\r|\n|\v)/g, '');
+                if (!str || (temp_str.includes(temp_res) && result)) {
+                    str = result;
+                } else if (!temp_str.includes(temp_res) && !temp_res.includes(temp_str)) {
+                    str += result ? (result + '\r\n\r\n') : '';
+                }
             }
         }
     });
@@ -50,7 +83,7 @@ function findImportantText($) {
     }
 
     let dirList = PLUGIN.readdirSync(`./${CONFIG.DIRECTORY_NAME}`), // 把结果存为文件，名字重复在后面增加'---\d'
-        fileName = $('title').text().replace(/(\||\:|\*|\\|\/|\"|\<|\>|\?)/g,' ');
+        fileName = $('title').text().replace(/(\||\:|\*|\\|\/|\"|\<|\>|\?)/g, ' '); // 保存文件，这些字符不能作为文件名
     if (dirList.includes(`${fileName}.txt`)) {
         let regRes = 0;
         dirList.forEach((item, idx) => {
@@ -66,14 +99,21 @@ function findImportantText($) {
 
 function checkParent($, $node) { // 判断节点是否符合
     let str_inner = $node.html()
-        .replace(/\s/g, '')
+        .replace(/(\r\n|\s|\t|\r|\n|\v)/g, '')
+        .replace(/\<img.*?src=\"(.*?)\".*?\>/g, function(str, $1) {
+            return `(插图：${$1})`;
+        })
+        .replace(/\<script.*?\>.*?\<\/script\>/g, '')
+        .replace(/\<style.*?\>.*?\<\/style\>/g, '')
         .replace(/\<\/?br\>/g, '\r\n')
         .replace(/\<\/(p|div)\>/g, '\r\n')
-        .replace(/\<.*\>/g, '')
-        // .replace(/\<\/.*\>/g, '')
         .replace(/\&nbsp;/g, ' ')
         .replace(/\&lt;/g, '<')
-        .replace(/\&gt;/g, '>');
+        .replace(/\&gt;/g, '>')
+        .replace(/(\r\n|\s){3,}/g, '\r\n')
+        .replace(/\<p.*?\>/g, '\t')
+        .replace(/\<\!--.*?--\>/g, '')  // 删除注释
+        .replace(/\<.*?\>/g, '')
     if (
         str_inner.length >= CONFIG.ARTICLE_LENGTH &&
         str_inner.match(new RegExp(CONFIG.KEY_WORDS, 'g')) &&
