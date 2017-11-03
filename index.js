@@ -69,10 +69,12 @@ function findImportantText($, url) {
                 let result = checkParent($, $(item).parent());
                 let temp_str = str.replace(/(\r\n|\s|\t|\r|\n|\v)/g, ''),
                     temp_res = result.replace(/(\r\n|\s|\t|\r|\n|\v)/g, '');
-                if (!str || (temp_str.includes(temp_res) && result)) {
+                if (!str) { // 首次添加
                     str = result;
-                } else if (!temp_str.includes(temp_res) && !temp_res.includes(temp_str)) {
-                    str += result ? (result + '\r\n\r\n') : '';
+                } else if (temp_str.includes(temp_res) && temp_res) {   // 文章更简短
+                    str = result;
+                } else if (!temp_str.includes(temp_res) && !temp_res.includes(temp_str)) {  // 新的段落
+                    str += '添加新：\r\n' + (result ? (result + '\r\n\r\n') : '');
                 }
             }
         }
@@ -110,19 +112,17 @@ function checkParent($, $node) { // 判断节点是否符合
         .replace(/\&nbsp;/g, ' ')
         .replace(/\&lt;/g, '<')
         .replace(/\&gt;/g, '>')
-        .replace(/(\r\n|\s){3,}/g, '\r\n')
+        .replace(/(\r\n){3,}/g, '\r\n')
         .replace(/\<p.*?\>/g, '\t')
-        .replace(/\<\!--.*?--\>/g, '')  // 删除注释
+        .replace(/\<\!--.*?--\>/g, '') // 删除注释
         .replace(/\<.*?\>/g, '')
     if (
         str_inner.length >= CONFIG.ARTICLE_LENGTH &&
         str_inner.match(new RegExp(CONFIG.KEY_WORDS, 'g')) &&
         str_inner.match(new RegExp(CONFIG.KEY_WORDS, 'g')).length >= CONFIG.KEY_WORDS_TIME
-        // true
     ) {
+        // return str_inner.length + JSON.stringify(str_inner.match(new RegExp(CONFIG.KEY_WORDS, 'g'))) + str_inner;
         return str_inner;
-        // len++;
-        // str += `${len}:${$(item)[0].tagName.toLowerCase()}\r\n${str_inner}\r\n`;
     }
     return '';
 }

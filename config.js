@@ -16,7 +16,7 @@ const configs = {
     ],
     DIRECTORY_NAME: '曾国藩文章',
     KEY_WORDS: '曾国藩',
-    KEY_WORDS_TIME: 3,
+    KEY_WORDS_TIME: 5,
     ARTICLE_LENGTH: 20,
 }
 
